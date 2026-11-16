@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-東証セクター資金流動・ローテーション監視ダッシュボード (スマホ最適化・日付軸改良版)
+東証セクター資金流動・ローテーション監視ダッシュボード (スマホ最適化・縦罫線＆日付軸修正版)
 """
 
 import datetime
@@ -199,7 +199,7 @@ fig_rrg.update_layout(
 )
 st.plotly_chart(fig_rrg, use_container_width=True)
 
-# --- ② 期間累積リターン推移グラフ（Datetime型＋Plotly自動間引きによるスマホ最適化） ---
+# --- ② 期間累積リターン推移グラフ（Datetime型＋縦罫線グリッド追加） ---
 st.subheader("② 期間累積リターン推移 (対TOPIX)")
 fig_cum = go.Figure()
 dates = pd.to_datetime(cum_ret.index)
@@ -215,15 +215,23 @@ fig_cum.add_trace(go.Scatter(
     line=dict(color="#111111", width=2.5, dash="dot")
 ))
 
-# 0%基準ラインを太く・視認しやすく強調
+# 0%基準ラインを強調
 fig_cum.add_hline(y=0, line_dash="solid", line_color="#444444", line_width=1.5)
 
 fig_cum.update_layout(
     xaxis=dict(
         type="date",
         tickformat="%m/%d",
-        nticks=6,  # スマホ画面でもラベルが重ならないよう自動間引き（最大約6個）
-        tickangle=0  # 横書きに固定
+        nticks=6,  # ラベルが重ならないよう自動間引き
+        tickangle=0,
+        showgrid=True,        # 縦の罫線（グリッド線）を表示
+        gridcolor="#E5E7EB",  # 罫線の色
+        gridwidth=1
+    ),
+    yaxis=dict(
+        showgrid=True,        # 横の罫線も綺麗に整理
+        gridcolor="#E5E7EB",
+        gridwidth=1
     ),
     yaxis_title="累積騰落率 (%)", 
     height=420,
