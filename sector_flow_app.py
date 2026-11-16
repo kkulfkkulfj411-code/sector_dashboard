@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-東証セクター資金流動・ローテーション監視ダッシュボード (スマホ最適化・縦罫線＆日付軸修正版)
+東証セクター資金流動・ローテーション監視ダッシュボード (RRG軸 対TOPIX明記版)
 """
 
 import datetime
@@ -145,15 +145,15 @@ with st.spinner("最新データを取得・計算中..."):
     ret_60d = {sec: round(float(cum_ret[sec].iloc[-1]), 2) for sec in sector_list}
     latest_rvol = {sec: round(float(sec_rvol_med[sec].iloc[-3:].mean()), 2) for sec in sector_list}
 
-# --- ① RRGグラフ ---
+# --- ① RRGグラフ（軸タイトルに対TOPIX比較を明記） ---
 st.subheader("① 資金ローテーション軌跡 (RRG)")
 
 with st.expander("📖 RRGグラフの見方（4エリアの意味）", expanded=False):
     st.markdown("""
-    - 🟢 **右上【主導 (Leading)】**：市場平均より強く、短期の資金流入も加速している本命セクター（順張り・強気）。
-    - 🔵 **左上【改善 (Improving)】**：中期的にはまだ弱いものの、直近で初動の資金が流入し始めているセクター（底値圏・初動）。
-    - 🟡 **右下【失速 (Weakening)】**：中期的には強いが、直近の資金流入が減速し利確売り等に押されている状態。
-    - 🔴 **左下【遅行 (Lagging)】**：市場平均より弱く、資金が流出している状態（避けるべきセクター）。
+    - 🟢 **右上【主導 (Leading)】**：TOPIXより強く、短期の資金流入も加速している本命セクター（順張り・強気）。
+    - 🔵 **左上【改善 (Improving)】**：中期的にはまだTOPIXに劣るが、直近で初動の資金が流入し始めているセクター（底値圏・初動）。
+    - 🟡 **右下【失速 (Weakening)】**：中期的にはTOPIXより強いが、直近の資金流入が減速し利確売り等に押されている状態。
+    - 🔴 **左下【遅行 (Lagging)】**：TOPIXより弱く、資金が流出している状態（避けるべきセクター）。
     """)
 
 fig_rrg = go.Figure()
@@ -175,7 +175,7 @@ for sec in sector_list:
     fig_rrg.add_trace(go.Scatter(
         x=xs, y=ys, mode="lines+markers", name=sec,
         line=dict(color=c, width=2.5), marker=dict(size=6, color=c),
-        hovertemplate=f"<b>{sec}</b><br>トレンド(X): %{{x}}<br>モメンタム(Y): %{{y}}<extra></extra>"
+        hovertemplate=f"<b>{sec}</b><br>対TOPIXトレンド(X): %{{x}}<br>短期モメンタム(Y): %{{y}}<extra></extra>"
     ))
     fig_rrg.add_trace(go.Scatter(
         x=[xs[-1]], y=[ys[-1]], mode="markers+text",
@@ -185,8 +185,8 @@ for sec in sector_list:
     ))
 
 fig_rrg.update_layout(
-    xaxis_title="中期相対トレンド (RS-Ratio)",
-    yaxis_title="短期資金モメンタム (RS-Momentum)",
+    xaxis_title="中期相対トレンド (対TOPIX RS-Ratio: 100=TOPIXと同等)",
+    yaxis_title="短期資金モメンタム (対TOPIX RS-Momentum)",
     height=500, 
     margin=dict(t=20, l=10, r=10, b=20),
     legend=dict(orientation="h", y=-0.28, font=dict(size=11)),
@@ -199,7 +199,7 @@ fig_rrg.update_layout(
 )
 st.plotly_chart(fig_rrg, use_container_width=True)
 
-# --- ② 期間累積リターン推移グラフ（Datetime型＋縦罫線グリッド追加） ---
+# --- ② 期間累積リターン推移グラフ ---
 st.subheader("② 期間累積リターン推移 (対TOPIX)")
 fig_cum = go.Figure()
 dates = pd.to_datetime(cum_ret.index)
@@ -215,21 +215,20 @@ fig_cum.add_trace(go.Scatter(
     line=dict(color="#111111", width=2.5, dash="dot")
 ))
 
-# 0%基準ラインを強調
 fig_cum.add_hline(y=0, line_dash="solid", line_color="#444444", line_width=1.5)
 
 fig_cum.update_layout(
     xaxis=dict(
         type="date",
         tickformat="%m/%d",
-        nticks=6,  # ラベルが重ならないよう自動間引き
+        nticks=6,
         tickangle=0,
-        showgrid=True,        # 縦の罫線（グリッド線）を表示
-        gridcolor="#E5E7EB",  # 罫線の色
+        showgrid=True,
+        gridcolor="#E5E7EB",
         gridwidth=1
     ),
     yaxis=dict(
-        showgrid=True,        # 横の罫線も綺麗に整理
+        showgrid=True,
         gridcolor="#E5E7EB",
         gridwidth=1
     ),
