@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-東証セクター資金流動・ローテーション監視ダッシュボード (スマホ最適化・完全版)
+東証セクター資金流動・ローテーション監視ダッシュボード (スマホ最適化・RRG拡大版)
 """
 
 import datetime
@@ -69,12 +69,13 @@ def fetch_data():
     volumes = volumes.loc[closes.index].fillna(0)
     return closes, volumes
 
-# サイドバー設定
+# サイドバー設定（スマホ閲覧を考慮し、デフォルトはマクロ6に設定）
 st.sidebar.title("🎛️ 表示設定")
 mode = st.sidebar.selectbox(
     "集計モード選択",
     ["topix_macro6", "topix17_etf"],
-    format_func=lambda x: "東証全体・6大マクロ業種 (スマホ最適)" if x=="topix_macro6" else "東証17業種ETF個別 (詳細)"
+    index=0,
+    format_func=lambda x: "★東証全体・6大マクロ業種 (スマホ閲覧に最適)" if x=="topix_macro6" else "東証17業種ETF個別 (詳細)"
 )
 window_days = st.sidebar.slider("表示期間 (営業日)", 20, 100, 60, 10)
 trail_len = st.sidebar.slider("RRG軌跡日数", 3, 15, 5, 1)
@@ -134,8 +135,9 @@ with st.spinner("最新データを取得・計算中..."):
 
     rs_x, rs_y = {}, {}
     for sec in sector_list:
-        x_series = 100.0 + (r20_rel[sec].iloc[-trail_len:] / std_r20) * 1.5
-        y_series = 100.0 + ((r5_rel[sec].iloc[-trail_len:] * 2.5 - r20_rel[sec].iloc[-trail_len:]) / std_mom) * 1.5
+        # 係数を 1.5 から 4.0 に拡大し、中心に寄りすぎず画面に大きく広がるように調整
+        x_series = 100.0 + (r20_rel[sec].iloc[-trail_len:] / std_r20) * 4.0
+        y_series = 100.0 + ((r5_rel[sec].iloc[-trail_len:] * 2.5 - r20_rel[sec].iloc[-trail_len:]) / std_mom) * 4.0
         rs_x[sec] = x_series.fillna(100.0).round(2).tolist()
         rs_y[sec] = y_series.fillna(100.0).round(2).tolist()
 
@@ -144,14 +146,14 @@ with st.spinner("最新データを取得・計算中..."):
     ret_60d = {sec: round(float(cum_ret[sec].iloc[-1]), 2) for sec in sector_list}
     latest_rvol = {sec: round(float(sec_rvol_med[sec].iloc[-3:].mean()), 2) for sec in sector_list}
 
-# --- ① RRGグラフ（グラフ内は番号文字だけに簡略化して文字被りを解消） ---
+# --- ① RRGグラフ（グラフ内は番号文字だけに簡略化し、自動フィットで中心に寄らないように改善） ---
 st.subheader("① 資金ローテーション軌跡 (RRG)")
 fig_rrg = go.Figure()
 
-fig_rrg.add_shape(type="rect", x0=100, x1=115, y0=100, y1=115, fillcolor="#E8F5E9", opacity=0.35, line_width=0)
-fig_rrg.add_shape(type="rect", x0=100, x1=115, y0=85, y1=100, fillcolor="#FFF8E1", opacity=0.4, line_width=0)
-fig_rrg.add_shape(type="rect", x0=85, x1=100, y0=85, y1=100, fillcolor="#FFEBEE", opacity=0.35, line_width=0)
-fig_rrg.add_shape(type="rect", x0=85, x1=100, y0=100, y1=115, fillcolor="#E3F2FD", opacity=0.35, line_width=0)
+fig_rrg.add_shape(type="rect", x0=100, x1=125, y0=100, y1=125, fillcolor="#E8F5E9", opacity=0.35, line_width=0)
+fig_rrg.add_shape(type="rect", x0=100, x1=125, y0=75, y1=100, fillcolor="#FFF8E1", opacity=0.4, line_width=0)
+fig_rrg.add_shape(type="rect", x0=75, x1=100, y0=75, y1=100, fillcolor="#FFEBEE", opacity=0.35, line_width=0)
+fig_rrg.add_shape(type="rect", x0=75, x1=100, y0=100, y1=125, fillcolor="#E3F2FD", opacity=0.35, line_width=0)
 
 fig_rrg.add_hline(y=100, line_dash="dash", line_color="gray")
 fig_rrg.add_vline(x=100, line_dash="dash", line_color="gray")
@@ -161,7 +163,7 @@ for sec in sector_list:
     c = colors.get(sec, "#333")
     vr = latest_rvol[sec]
     
-    # マクロ6モードの場合は先頭の番号（例：「①」、「②」など）だけをグラフ上に表示
+    # マクロ6モードの場合は先頭の番号（例：「①」、「②」など）だけをグラフ上に表示して文字被りを防止
     short_label = sec[:2] if mode == "topix_macro6" else sec
     
     fig_rrg.add_trace(go.Scatter(
@@ -181,7 +183,7 @@ fig_rrg.update_layout(
     yaxis_title="短期資金モメンタム (RS-Momentum)",
     height=480, 
     margin=dict(t=10, l=10, r=10, b=10),
-    legend=dict(orientation="h", y=-0.28, font=dict(size=10))
+    legend=dict(orientation="h", y=-0.28, font=dict(size=11))
 )
 st.plotly_chart(fig_rrg, use_container_width=True)
 
@@ -209,11 +211,10 @@ fig_cum.update_layout(
 )
 st.plotly_chart(fig_cum, use_container_width=True)
 
-# --- ③ スマホ最適化カード型ランキング（スクロール不要で視認性抜群） ---
+# --- ③ スマホ最適化カード型ランキング ---
 st.subheader("📋 セクター別 モメンタム＆代金ランキング")
-st.markdown("<small>※プラスは赤色、マイナスは青色。代金倍率1.2倍超や騰落率±3%超は太字で強調</small>", unsafe_allow_html=True)
+st.markdown("<small>※プラスは赤色、マイナスは紺色。代金倍率1.2倍超や騰落率±3%超は太字で強調</small>", unsafe_allow_html=True)
 
-# 5日騰落率の降順にソート
 sorted_sectors = sorted(sector_list, key=lambda s: ret_5d[s], reverse=True)
 
 for sec in sorted_sectors:
@@ -222,7 +223,6 @@ for sec in sorted_sectors:
     r60 = ret_60d[sec]
     rv = latest_rvol[sec]
     
-    # 色と太字の動的設定
     r5_color = "#D62828" if r5 >= 0 else "#1D3557"
     r5_style = f"color: {r5_color}; font-weight: {'bold' if abs(r5) >= 3.0 else 'normal'};"
     
@@ -233,7 +233,6 @@ for sec in sorted_sectors:
     
     sec_color = colors.get(sec, "#333")
 
-    # カード型のHTMLコンテナを出力
     card_html = f"""
     <div style="background-color: #ffffff; padding: 10px 14px; border-radius: 8px; margin-bottom: 8px; border-left: 5px solid {sec_color}; box-shadow: 0 1px 3px rgba(0,0,0,0.08);">
         <div style="font-weight: bold; font-size: 14.5px; margin-bottom: 4px; color: #111;">{sec}</div>
