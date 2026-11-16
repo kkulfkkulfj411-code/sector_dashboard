@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-東証セクター資金流動・ローテーション監視ダッシュボード (情報充実型・スマホ最適化版)
+東証セクター資金流動・ローテーション監視ダッシュボード (RRGエリア解説追加・スマホ最適化版)
 """
 
 import datetime
@@ -145,8 +145,17 @@ with st.spinner("最新データを取得・計算中..."):
     ret_60d = {sec: round(float(cum_ret[sec].iloc[-1]), 2) for sec in sector_list}
     latest_rvol = {sec: round(float(sec_rvol_med[sec].iloc[-3:].mean()), 2) for sec in sector_list}
 
-# --- ① RRGグラフ ---
+# --- ① RRGグラフ（四隅にエリア解説ラベルを常時配置） ---
 st.subheader("① 資金ローテーション軌跡 (RRG)")
+
+with st.expander("📖 RRGグラフの見方（4エリアの意味）", expanded=False):
+    st.markdown("""
+    - 🟢 **右上【主導 (Leading)】**：市場平均より強く、短期の資金流入も加速している本命セクター（順張り・強気）。
+    - 🔵 **左上【改善 (Improving)】**：中期的にはまだ弱いものの、直近で初動の資金が流入し始めているセクター（底値圏・初動）。
+    - 🟡 **右下【失速 (Weakening)】**：中期的には強いが、直近の資金流入が減速し利確売り等に押されている状態。
+    - 🔴 **左下【遅行 (Lagging)】**：市場平均より弱く、資金が流出している状態（避けるべきセクター）。
+    """)
+
 fig_rrg = go.Figure()
 
 fig_rrg.add_shape(type="rect", x0=100, x1=125, y0=100, y1=125, fillcolor="#E8F5E9", opacity=0.35, line_width=0)
@@ -175,12 +184,19 @@ for sec in sector_list:
         showlegend=False, hovertemplate=f"<b>{sec} (最新)</b><br>代金倍率: {vr}倍<br>5日騰落: {ret_5d[sec]}%<extra></extra>"
     ))
 
+# グラフ内の四隅に4エリアのラベルをアノテーションとして固定配置
 fig_rrg.update_layout(
     xaxis_title="中期相対トレンド (RS-Ratio)",
     yaxis_title="短期資金モメンタム (RS-Momentum)",
-    height=480, 
-    margin=dict(t=10, l=10, r=10, b=10),
-    legend=dict(orientation="h", y=-0.28, font=dict(size=11))
+    height=500, 
+    margin=dict(t=20, l=10, r=10, b=20),
+    legend=dict(orientation="h", y=-0.28, font=dict(size=11)),
+    annotations=[
+        dict(x=0.98, y=0.98, xref="paper", yref="paper", text="<b>【主導 Leading】</b>", showarrow=False, xanchor="right", yanchor="top", font=dict(size=11, color="#1B5E20"), bgcolor="rgba(232, 245, 233, 0.85)", borderpad=3),
+        dict(x=0.02, y=0.98, xref="paper", yref="paper", text="<b>【改善 Improving】</b>", showarrow=False, xanchor="left", yanchor="top", font=dict(size=11, color="#0D47A1"), bgcolor="rgba(227, 242, 253, 0.85)", borderpad=3),
+        dict(x=0.98, y=0.02, xref="paper", yref="paper", text="<b>【失速 Weakening】</b>", showarrow=False, xanchor="right", yanchor="bottom", font=dict(size=11, color="#E65100"), bgcolor="rgba(255, 248, 225, 0.85)", borderpad=3),
+        dict(x=0.02, y=0.02, xref="paper", yref="paper", text="<b>【遅行 Lagging】</b>", showarrow=False, xanchor="left", yanchor="bottom", font=dict(size=11, color="#B71C1C"), bgcolor="rgba(255, 235, 235, 0.85)", borderpad=3),
+    ]
 )
 st.plotly_chart(fig_rrg, use_container_width=True)
 
@@ -220,7 +236,6 @@ for sec in sorted_sectors:
     r60 = ret_60d[sec]
     rv = latest_rvol[sec]
     
-    # スタイル関数
     def get_style(val, threshold):
         color = "#D62828" if val >= 0 else "#1D3557"
         weight = "bold" if abs(val) >= threshold else "normal"
@@ -233,7 +248,6 @@ for sec in sorted_sectors:
     
     sec_color = colors.get(sec, "#333")
 
-    # 2段構成のカード型UI（短期・中期・長期・代金倍率をすべて網羅）
     card_html = f"""
     <div style="background-color: #ffffff; padding: 10px 14px; border-radius: 8px; margin-bottom: 8px; border-left: 5px solid {sec_color}; box-shadow: 0 1px 3px rgba(0,0,0,0.08);">
         <div style="font-weight: bold; font-size: 14.5px; margin-bottom: 6px; color: #111; display: flex; justify-content: space-between;">
