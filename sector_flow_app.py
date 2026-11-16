@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-東証セクター資金流動・ローテーション監視ダッシュボード (スマホ完全最適化・独立版)
+東証セクター資金流動・ローテーション監視ダッシュボード (スマホ最適化・完全版)
 """
 
 import datetime
@@ -144,7 +144,7 @@ with st.spinner("最新データを取得・計算中..."):
     ret_60d = {sec: round(float(cum_ret[sec].iloc[-1]), 2) for sec in sector_list}
     latest_rvol = {sec: round(float(sec_rvol_med[sec].iloc[-3:].mean()), 2) for sec in sector_list}
 
-# --- グラフ描画（スマホで縦積みになるレイアウト） ---
+# --- ① RRGグラフ（グラフ内は番号文字だけに簡略化して文字被りを解消） ---
 st.subheader("① 資金ローテーション軌跡 (RRG)")
 fig_rrg = go.Figure()
 
@@ -161,6 +161,9 @@ for sec in sector_list:
     c = colors.get(sec, "#333")
     vr = latest_rvol[sec]
     
+    # マクロ6モードの場合は先頭の番号（例：「①」、「②」など）だけをグラフ上に表示
+    short_label = sec[:2] if mode == "topix_macro6" else sec
+    
     fig_rrg.add_trace(go.Scatter(
         x=xs, y=ys, mode="lines+markers", name=sec,
         line=dict(color=c, width=2.5), marker=dict(size=6, color=c),
@@ -168,7 +171,7 @@ for sec in sector_list:
     ))
     fig_rrg.add_trace(go.Scatter(
         x=[xs[-1]], y=[ys[-1]], mode="markers+text",
-        text=[f"{sec} ({vr}x)"], textposition="top center",
+        text=[f"{short_label} ({vr}x)"], textposition="top center",
         marker=dict(size=max(vr * 14, 12), color=c, line=dict(color="white", width=2)),
         showlegend=False, hovertemplate=f"<b>{sec} (最新)</b><br>代金倍率: {vr}倍<br>5日騰落: {ret_5d[sec]}%<extra></extra>"
     ))
@@ -178,10 +181,11 @@ fig_rrg.update_layout(
     yaxis_title="短期資金モメンタム (RS-Momentum)",
     height=480, 
     margin=dict(t=10, l=10, r=10, b=10),
-    legend=dict(orientation="h", y=-0.25, font=dict(size=11))
+    legend=dict(orientation="h", y=-0.28, font=dict(size=10))
 )
 st.plotly_chart(fig_rrg, use_container_width=True)
 
+# --- ② 累積リターン推移グラフ ---
 st.subheader("② 期間累積リターン推移 (対TOPIX)")
 fig_cum = go.Figure()
 dates = pd.to_datetime(cum_ret.index)
@@ -197,23 +201,47 @@ fig_cum.add_trace(go.Scatter(
     line=dict(color="#111111", width=2.5, dash="dot")
 ))
 
-# スマホ表示でグラフが圧縮されないよう、凡例を下部に水平配置
 fig_cum.update_layout(
     yaxis_title="累積騰落率 (%)", 
     height=420,
     margin=dict(t=10, l=10, r=10, b=10), 
-    legend=dict(orientation="h", y=-0.35, font=dict(size=10))
+    legend=dict(orientation="h", y=-0.38, font=dict(size=9.5))
 )
 st.plotly_chart(fig_cum, use_container_width=True)
 
-# --- ランキングテーブル（スマホでスクロールしなくても主要数値が見えるよう重要度順に整理） ---
+# --- ③ スマホ最適化カード型ランキング（スクロール不要で視認性抜群） ---
 st.subheader("📋 セクター別 モメンタム＆代金ランキング")
-df_table = pd.DataFrame({
-    "セクター名": sector_list,
-    "短期5日(%)": [ret_5d[s] for s in sector_list],
-    "代金倍率": [latest_rvol[s] for s in sector_list],
-    "中期20日(%)": [ret_20d[s] for s in sector_list],
-    f"長期{window_days}日(%)": [ret_60d[s] for s in sector_list],
-}).sort_values(by="短期5日(%)", ascending=False).reset_index(drop=True)
+st.markdown("<small>※プラスは赤色、マイナスは青色。代金倍率1.2倍超や騰落率±3%超は太字で強調</small>", unsafe_allow_html=True)
 
-st.dataframe(df_table, use_container_width=True, hide_index=True)
+# 5日騰落率の降順にソート
+sorted_sectors = sorted(sector_list, key=lambda s: ret_5d[s], reverse=True)
+
+for sec in sorted_sectors:
+    r5 = ret_5d[sec]
+    r20 = ret_20d[sec]
+    r60 = ret_60d[sec]
+    rv = latest_rvol[sec]
+    
+    # 色と太字の動的設定
+    r5_color = "#D62828" if r5 >= 0 else "#1D3557"
+    r5_style = f"color: {r5_color}; font-weight: {'bold' if abs(r5) >= 3.0 else 'normal'};"
+    
+    r20_color = "#D62828" if r20 >= 0 else "#1D3557"
+    r20_style = f"color: {r20_color}; font-weight: {'bold' if abs(r20) >= 5.0 else 'normal'};"
+    
+    rv_style = f"font-weight: {'bold' if rv >= 1.2 else 'normal'}; color: {'#D97706' if rv >= 1.2 else '#222'};"
+    
+    sec_color = colors.get(sec, "#333")
+
+    # カード型のHTMLコンテナを出力
+    card_html = f"""
+    <div style="background-color: #ffffff; padding: 10px 14px; border-radius: 8px; margin-bottom: 8px; border-left: 5px solid {sec_color}; box-shadow: 0 1px 3px rgba(0,0,0,0.08);">
+        <div style="font-weight: bold; font-size: 14.5px; margin-bottom: 4px; color: #111;">{sec}</div>
+        <div style="display: flex; justify-content: space-between; font-size: 13px;">
+            <span>短期5日: <b style="{r5_style}">{r5:+.2f}%</b></span>
+            <span>代金倍率: <b style="{rv_style}">{rv:.2f}倍</b></span>
+            <span>中期20日: <span style="{r20_style}">{r20:+.2f}%</span></span>
+        </div>
+    </div>
+    """
+    st.markdown(card_html, unsafe_allow_html=True)
