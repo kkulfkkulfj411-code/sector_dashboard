@@ -18,8 +18,8 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-BENCHMARK_TOPIX = "1306"
-BENCHMARK_GROWTH = "2516"
+BENCHMARK_TOPIX_CODE = "1306"
+BENCHMARK_GROWTH_CODE = "2516"
 
 TOPIX17_ETFS = [
     ("1617", "食品(17業種)", "#38B000"),
@@ -52,7 +52,7 @@ MACRO6_GROUPS = {
 
 @st.cache_data(ttl=3600)
 def fetch_data():
-    codes = [BENCHMARK_TOPIX, BENCHMARK_GROWTH] + [c for c, _, _ in TOPIX17_ETFS]
+    codes = [BENCHMARK_TOPIX_CODE, BENCHMARK_GROWTH_CODE] + [c for c, _, _ in TOPIX17_ETFS]
     yf_tickers = [f"{c}.T" for c in codes]
     end_dt = datetime.date.today() + datetime.timedelta(days=1)
     start_dt = end_dt - datetime.timedelta(days=160)
@@ -69,7 +69,7 @@ def fetch_data():
     volumes = volumes.loc[closes.index].fillna(0)
     return closes, volumes
 
-# スマホからでも操作しやすい上部タブまたはサイドバー設定
+# スマホからでも操作しやすいサイドバー設定
 st.sidebar.title("🎛️ 表示設定")
 mode = st.sidebar.selectbox(
     "集計モード選択",
@@ -144,7 +144,7 @@ with st.spinner("最新データを取得・計算中..."):
     ret_60d = {sec: round(float(cum_ret[sec].iloc[-1]), 2) for sec in sector_list}
     latest_rvol = {sec: round(float(sec_rvol_med[sec].iloc[-3:].mean()), 2) for sec in sector_list}
 
-# スマホ表示（画面幅が狭い場合）ではカラムが自動的に縦に積み重なるため視認性を確保
+# スマホ表示（画面幅が狭い場合）では自動的に縦並びに最適化されます
 col1, col2 = st.columns([1.15, 1.0])
 
 with col1:
