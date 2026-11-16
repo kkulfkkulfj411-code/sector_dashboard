@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-東証セクター資金流動・ローテーション監視ダッシュボード (スマホ最適化・RRG拡大版)
+東証セクター資金流動・ローテーション監視ダッシュボード (情報充実型・スマホ最適化版)
 """
 
 import datetime
@@ -69,7 +69,7 @@ def fetch_data():
     volumes = volumes.loc[closes.index].fillna(0)
     return closes, volumes
 
-# サイドバー設定（スマホ閲覧を考慮し、デフォルトはマクロ6に設定）
+# サイドバー設定
 st.sidebar.title("🎛️ 表示設定")
 mode = st.sidebar.selectbox(
     "集計モード選択",
@@ -135,7 +135,6 @@ with st.spinner("最新データを取得・計算中..."):
 
     rs_x, rs_y = {}, {}
     for sec in sector_list:
-        # 係数を 1.5 から 4.0 に拡大し、中心に寄りすぎず画面に大きく広がるように調整
         x_series = 100.0 + (r20_rel[sec].iloc[-trail_len:] / std_r20) * 4.0
         y_series = 100.0 + ((r5_rel[sec].iloc[-trail_len:] * 2.5 - r20_rel[sec].iloc[-trail_len:]) / std_mom) * 4.0
         rs_x[sec] = x_series.fillna(100.0).round(2).tolist()
@@ -146,7 +145,7 @@ with st.spinner("最新データを取得・計算中..."):
     ret_60d = {sec: round(float(cum_ret[sec].iloc[-1]), 2) for sec in sector_list}
     latest_rvol = {sec: round(float(sec_rvol_med[sec].iloc[-3:].mean()), 2) for sec in sector_list}
 
-# --- ① RRGグラフ（グラフ内は番号文字だけに簡略化し、自動フィットで中心に寄らないように改善） ---
+# --- ① RRGグラフ ---
 st.subheader("① 資金ローテーション軌跡 (RRG)")
 fig_rrg = go.Figure()
 
@@ -162,8 +161,6 @@ for sec in sector_list:
     xs, ys = rs_x[sec], rs_y[sec]
     c = colors.get(sec, "#333")
     vr = latest_rvol[sec]
-    
-    # マクロ6モードの場合は先頭の番号（例：「①」、「②」など）だけをグラフ上に表示して文字被りを防止
     short_label = sec[:2] if mode == "topix_macro6" else sec
     
     fig_rrg.add_trace(go.Scatter(
@@ -211,9 +208,9 @@ fig_cum.update_layout(
 )
 st.plotly_chart(fig_cum, use_container_width=True)
 
-# --- ③ スマホ最適化カード型ランキング ---
+# --- ③ 情報充実型・スマホ最適化カード型ランキング ---
 st.subheader("📋 セクター別 モメンタム＆代金ランキング")
-st.markdown("<small>※プラスは赤色、マイナスは紺色。代金倍率1.2倍超や騰落率±3%超は太字で強調</small>", unsafe_allow_html=True)
+st.markdown("<small>※プラスは赤、マイナスは紺。代金倍率1.2倍超や騰落率±3%超は太字</small>", unsafe_allow_html=True)
 
 sorted_sectors = sorted(sector_list, key=lambda s: ret_5d[s], reverse=True)
 
@@ -223,23 +220,30 @@ for sec in sorted_sectors:
     r60 = ret_60d[sec]
     rv = latest_rvol[sec]
     
-    r5_color = "#D62828" if r5 >= 0 else "#1D3557"
-    r5_style = f"color: {r5_color}; font-weight: {'bold' if abs(r5) >= 3.0 else 'normal'};"
-    
-    r20_color = "#D62828" if r20 >= 0 else "#1D3557"
-    r20_style = f"color: {r20_color}; font-weight: {'bold' if abs(r20) >= 5.0 else 'normal'};"
-    
+    # スタイル関数
+    def get_style(val, threshold):
+        color = "#D62828" if val >= 0 else "#1D3557"
+        weight = "bold" if abs(val) >= threshold else "normal"
+        return f"color: {color}; font-weight: {weight};"
+
+    r5_style = get_style(r5, 3.0)
+    r20_style = get_style(r20, 5.0)
+    r60_style = get_style(r60, 10.0)
     rv_style = f"font-weight: {'bold' if rv >= 1.2 else 'normal'}; color: {'#D97706' if rv >= 1.2 else '#222'};"
     
     sec_color = colors.get(sec, "#333")
 
+    # 2段構成のカード型UI（短期・中期・長期・代金倍率をすべて網羅）
     card_html = f"""
     <div style="background-color: #ffffff; padding: 10px 14px; border-radius: 8px; margin-bottom: 8px; border-left: 5px solid {sec_color}; box-shadow: 0 1px 3px rgba(0,0,0,0.08);">
-        <div style="font-weight: bold; font-size: 14.5px; margin-bottom: 4px; color: #111;">{sec}</div>
-        <div style="display: flex; justify-content: space-between; font-size: 13px;">
+        <div style="font-weight: bold; font-size: 14.5px; margin-bottom: 6px; color: #111; display: flex; justify-content: space-between;">
+            <span>{sec}</span>
+            <span style="font-size: 12.5px; font-weight: normal;">代金倍率: <b style="{rv_style}">{rv:.2f}倍</b></span>
+        </div>
+        <div style="display: flex; justify-content: space-between; font-size: 12.5px; background: #F8F9FA; padding: 5px 8px; border-radius: 4px;">
             <span>短期5日: <b style="{r5_style}">{r5:+.2f}%</b></span>
-            <span>代金倍率: <b style="{rv_style}">{rv:.2f}倍</b></span>
             <span>中期20日: <span style="{r20_style}">{r20:+.2f}%</span></span>
+            <span>長期{window_days}日: <span style="{r60_style}">{r60:+.2f}%</span></span>
         </div>
     </div>
     """
