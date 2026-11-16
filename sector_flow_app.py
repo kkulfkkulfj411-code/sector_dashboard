@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-東証セクター資金流動・ローテーション監視ダッシュボード (スマホ最適化・独立版)
+東証セクター資金流動・ローテーション監視ダッシュボード (スマホ完全最適化・独立版)
 """
 
 import datetime
@@ -10,7 +10,7 @@ import numpy as np
 import plotly.graph_objects as go
 import yfinance as yf
 
-# ページ設定（スマホ閲覧を考慮し、サイドバー初期非表示・wideレイアウト）
+# ページ設定（スマホ閲覧に最適化）
 st.set_page_config(
     page_title="セクター資金流動ダッシュボード",
     page_icon="📈",
@@ -69,12 +69,12 @@ def fetch_data():
     volumes = volumes.loc[closes.index].fillna(0)
     return closes, volumes
 
-# スマホからでも操作しやすいサイドバー設定
+# サイドバー設定
 st.sidebar.title("🎛️ 表示設定")
 mode = st.sidebar.selectbox(
     "集計モード選択",
     ["topix_macro6", "topix17_etf"],
-    format_func=lambda x: "東証全体・6大マクロ業種 (スマホ閲覧に最適)" if x=="topix_macro6" else "東証17業種ETF個別 (詳細)"
+    format_func=lambda x: "東証全体・6大マクロ業種 (スマホ最適)" if x=="topix_macro6" else "東証17業種ETF個別 (詳細)"
 )
 window_days = st.sidebar.slider("表示期間 (営業日)", 20, 100, 60, 10)
 trail_len = st.sidebar.slider("RRG軌跡日数", 3, 15, 5, 1)
@@ -144,75 +144,76 @@ with st.spinner("最新データを取得・計算中..."):
     ret_60d = {sec: round(float(cum_ret[sec].iloc[-1]), 2) for sec in sector_list}
     latest_rvol = {sec: round(float(sec_rvol_med[sec].iloc[-3:].mean()), 2) for sec in sector_list}
 
-# スマホ表示（画面幅が狭い場合）では自動的に縦並びに最適化されます
-col1, col2 = st.columns([1.15, 1.0])
+# --- グラフ描画（スマホで縦積みになるレイアウト） ---
+st.subheader("① 資金ローテーション軌跡 (RRG)")
+fig_rrg = go.Figure()
 
-with col1:
-    st.subheader("① 資金ローテーション軌跡 (RRG)")
-    fig_rrg = go.Figure()
+fig_rrg.add_shape(type="rect", x0=100, x1=115, y0=100, y1=115, fillcolor="#E8F5E9", opacity=0.35, line_width=0)
+fig_rrg.add_shape(type="rect", x0=100, x1=115, y0=85, y1=100, fillcolor="#FFF8E1", opacity=0.4, line_width=0)
+fig_rrg.add_shape(type="rect", x0=85, x1=100, y0=85, y1=100, fillcolor="#FFEBEE", opacity=0.35, line_width=0)
+fig_rrg.add_shape(type="rect", x0=85, x1=100, y0=100, y1=115, fillcolor="#E3F2FD", opacity=0.35, line_width=0)
+
+fig_rrg.add_hline(y=100, line_dash="dash", line_color="gray")
+fig_rrg.add_vline(x=100, line_dash="dash", line_color="gray")
+
+for sec in sector_list:
+    xs, ys = rs_x[sec], rs_y[sec]
+    c = colors.get(sec, "#333")
+    vr = latest_rvol[sec]
     
-    fig_rrg.add_shape(type="rect", x0=100, x1=115, y0=100, y1=115, fillcolor="#E8F5E9", opacity=0.4, line_width=0)
-    fig_rrg.add_shape(type="rect", x0=100, x1=115, y0=85, y1=100, fillcolor="#FFF8E1", opacity=0.4, line_width=0)
-    fig_rrg.add_shape(type="rect", x0=85, x1=100, y0=85, y1=100, fillcolor="#FFEBEE", opacity=0.4, line_width=0)
-    fig_rrg.add_shape(type="rect", x0=85, x1=100, y0=100, y1=115, fillcolor="#E3F2FD", opacity=0.4, line_width=0)
-
-    fig_rrg.add_hline(y=100, line_dash="dash", line_color="gray")
-    fig_rrg.add_vline(x=100, line_dash="dash", line_color="gray")
-
-    for sec in sector_list:
-        xs, ys = rs_x[sec], rs_y[sec]
-        c = colors.get(sec, "#333")
-        vr = latest_rvol[sec]
-        
-        fig_rrg.add_trace(go.Scatter(
-            x=xs, y=ys, mode="lines+markers", name=sec,
-            line=dict(color=c, width=2.5), marker=dict(size=6, color=c),
-            hovertemplate=f"<b>{sec}</b><br>トレンド(X): %{{x}}<br>モメンタム(Y): %{{y}}<extra></extra>"
-        ))
-        fig_rrg.add_trace(go.Scatter(
-            x=[xs[-1]], y=[ys[-1]], mode="markers+text",
-            text=[f"{sec} ({vr}x)"], textposition="top center",
-            marker=dict(size=max(vr * 14, 12), color=c, line=dict(color="white", width=2)),
-            showlegend=False, hovertemplate=f"<b>{sec} (最新)</b><br>代金倍率: {vr}倍<br>5日騰落: {ret_5d[sec]}%<extra></extra>"
-        ))
-
-    fig_rrg.update_layout(
-        xaxis_title="中期相対トレンド (RS-Ratio)",
-        yaxis_title="短期資金モメンタム (RS-Momentum)",
-        height=520, margin=dict(t=20, l=20, r=20, b=20),
-        legend=dict(orientation="h", y=-0.25, font=dict(size=10))
-    )
-    st.plotly_chart(fig_rrg, use_container_width=True)
-
-with col2:
-    st.subheader("② 累積リターン推移 (対TOPIX)")
-    fig_cum = go.Figure()
-    dates = pd.to_datetime(cum_ret.index)
-    
-    for sec in sector_list:
-        fig_cum.add_trace(go.Scatter(
-            x=dates, y=cum_ret[sec], mode="lines", name=f"{sec} ({cum_ret[sec].iloc[-1]:+.1f}%)",
-            line=dict(color=colors.get(sec, "#555"), width=2.2)
-        ))
-    
-    fig_cum.add_trace(go.Scatter(
-        x=dates, y=topix_plot, mode="lines", name=f"★TOPIX ({topix_plot.iloc[-1]:+.1f}%)",
-        line=dict(color="#111111", width=2.8, dash="dot")
+    fig_rrg.add_trace(go.Scatter(
+        x=xs, y=ys, mode="lines+markers", name=sec,
+        line=dict(color=c, width=2.5), marker=dict(size=6, color=c),
+        hovertemplate=f"<b>{sec}</b><br>トレンド(X): %{{x}}<br>モメンタム(Y): %{{y}}<extra></extra>"
     ))
-    
-    fig_cum.update_layout(
-        yaxis_title="累積騰落率 (%)", height=520,
-        margin=dict(t=20, l=20, r=20, b=20), legend=dict(font=dict(size=9.5))
-    )
-    st.plotly_chart(fig_cum, use_container_width=True)
+    fig_rrg.add_trace(go.Scatter(
+        x=[xs[-1]], y=[ys[-1]], mode="markers+text",
+        text=[f"{sec} ({vr}x)"], textposition="top center",
+        marker=dict(size=max(vr * 14, 12), color=c, line=dict(color="white", width=2)),
+        showlegend=False, hovertemplate=f"<b>{sec} (最新)</b><br>代金倍率: {vr}倍<br>5日騰落: {ret_5d[sec]}%<extra></extra>"
+    ))
 
-st.subheader("📋 セクター別 モメンタム＆売買代金ランキング")
+fig_rrg.update_layout(
+    xaxis_title="中期相対トレンド (RS-Ratio)",
+    yaxis_title="短期資金モメンタム (RS-Momentum)",
+    height=480, 
+    margin=dict(t=10, l=10, r=10, b=10),
+    legend=dict(orientation="h", y=-0.25, font=dict(size=11))
+)
+st.plotly_chart(fig_rrg, use_container_width=True)
+
+st.subheader("② 期間累積リターン推移 (対TOPIX)")
+fig_cum = go.Figure()
+dates = pd.to_datetime(cum_ret.index)
+
+for sec in sector_list:
+    fig_cum.add_trace(go.Scatter(
+        x=dates, y=cum_ret[sec], mode="lines", name=sec,
+        line=dict(color=colors.get(sec, "#555"), width=2.2)
+    ))
+
+fig_cum.add_trace(go.Scatter(
+    x=dates, y=topix_plot, mode="lines", name="★TOPIX基準",
+    line=dict(color="#111111", width=2.5, dash="dot")
+))
+
+# スマホ表示でグラフが圧縮されないよう、凡例を下部に水平配置
+fig_cum.update_layout(
+    yaxis_title="累積騰落率 (%)", 
+    height=420,
+    margin=dict(t=10, l=10, r=10, b=10), 
+    legend=dict(orientation="h", y=-0.35, font=dict(size=10))
+)
+st.plotly_chart(fig_cum, use_container_width=True)
+
+# --- ランキングテーブル（スマホでスクロールしなくても主要数値が見えるよう重要度順に整理） ---
+st.subheader("📋 セクター別 モメンタム＆代金ランキング")
 df_table = pd.DataFrame({
     "セクター名": sector_list,
-    "短期 5日 (%)": [ret_5d[s] for s in sector_list],
-    "中期 20日 (%)": [ret_20d[s] for s in sector_list],
-    f"長期 {window_days}日 (%)": [ret_60d[s] for s in sector_list],
+    "短期5日(%)": [ret_5d[s] for s in sector_list],
     "代金倍率": [latest_rvol[s] for s in sector_list],
-}).sort_values(by="短期 5日 (%)", ascending=False).reset_index(drop=True)
+    "中期20日(%)": [ret_20d[s] for s in sector_list],
+    f"長期{window_days}日(%)": [ret_60d[s] for s in sector_list],
+}).sort_values(by="短期5日(%)", ascending=False).reset_index(drop=True)
 
-st.dataframe(df_table, use_container_width=True)
+st.dataframe(df_table, use_container_width=True, hide_index=True)
