@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-東証セクター資金流動・ローテーション監視ダッシュボード (RRGエリア解説追加・スマホ最適化版)
+東証セクター資金流動・ローテーション監視ダッシュボード (スマホ最適化・完全版)
 """
 
 import datetime
@@ -145,7 +145,7 @@ with st.spinner("最新データを取得・計算中..."):
     ret_60d = {sec: round(float(cum_ret[sec].iloc[-1]), 2) for sec in sector_list}
     latest_rvol = {sec: round(float(sec_rvol_med[sec].iloc[-3:].mean()), 2) for sec in sector_list}
 
-# --- ① RRGグラフ（四隅にエリア解説ラベルを常時配置） ---
+# --- ① RRGグラフ ---
 st.subheader("① 資金ローテーション軌跡 (RRG)")
 
 with st.expander("📖 RRGグラフの見方（4エリアの意味）", expanded=False):
@@ -184,7 +184,6 @@ for sec in sector_list:
         showlegend=False, hovertemplate=f"<b>{sec} (最新)</b><br>代金倍率: {vr}倍<br>5日騰落: {ret_5d[sec]}%<extra></extra>"
     ))
 
-# グラフ内の四隅に4エリアのラベルをアノテーションとして固定配置
 fig_rrg.update_layout(
     xaxis_title="中期相対トレンド (RS-Ratio)",
     yaxis_title="短期資金モメンタム (RS-Momentum)",
@@ -200,21 +199,25 @@ fig_rrg.update_layout(
 )
 st.plotly_chart(fig_rrg, use_container_width=True)
 
-# --- ② 累積リターン推移グラフ ---
+# --- ② 期間累積リターン推移グラフ（日付を数字表記 [MM/DD] に変更 ＆ 0%ライン強調） ---
 st.subheader("② 期間累積リターン推移 (対TOPIX)")
 fig_cum = go.Figure()
 dates = pd.to_datetime(cum_ret.index)
+dates_str = dates.strftime('%m/%d').tolist()  # 英語表記を防ぐため「月/日」の数字形式に変換
 
 for sec in sector_list:
     fig_cum.add_trace(go.Scatter(
-        x=dates, y=cum_ret[sec], mode="lines", name=sec,
+        x=dates_str, y=cum_ret[sec], mode="lines", name=sec,
         line=dict(color=colors.get(sec, "#555"), width=2.2)
     ))
 
 fig_cum.add_trace(go.Scatter(
-    x=dates, y=topix_plot, mode="lines", name="★TOPIX基準",
+    x=dates_str, y=topix_plot, mode="lines", name="★TOPIX基準",
     line=dict(color="#111111", width=2.5, dash="dot")
 ))
+
+# 0%基準ラインを太く・視認しやすく強調
+fig_cum.add_hline(y=0, line_dash="solid", line_color="#444444", line_width=1.5)
 
 fig_cum.update_layout(
     yaxis_title="累積騰落率 (%)", 
