@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-東証セクター資金流動・ローテーション監視ダッシュボード (スマホ最適化・完全版)
+東証セクター資金流動・ローテーション監視ダッシュボード (スマホ最適化・日付軸改良版)
 """
 
 import datetime
@@ -199,20 +199,19 @@ fig_rrg.update_layout(
 )
 st.plotly_chart(fig_rrg, use_container_width=True)
 
-# --- ② 期間累積リターン推移グラフ（日付を数字表記 [MM/DD] に変更 ＆ 0%ライン強調） ---
+# --- ② 期間累積リターン推移グラフ（Datetime型＋Plotly自動間引きによるスマホ最適化） ---
 st.subheader("② 期間累積リターン推移 (対TOPIX)")
 fig_cum = go.Figure()
 dates = pd.to_datetime(cum_ret.index)
-dates_str = dates.strftime('%m/%d').tolist()  # 英語表記を防ぐため「月/日」の数字形式に変換
 
 for sec in sector_list:
     fig_cum.add_trace(go.Scatter(
-        x=dates_str, y=cum_ret[sec], mode="lines", name=sec,
+        x=dates, y=cum_ret[sec], mode="lines", name=sec,
         line=dict(color=colors.get(sec, "#555"), width=2.2)
     ))
 
 fig_cum.add_trace(go.Scatter(
-    x=dates_str, y=topix_plot, mode="lines", name="★TOPIX基準",
+    x=dates, y=topix_plot, mode="lines", name="★TOPIX基準",
     line=dict(color="#111111", width=2.5, dash="dot")
 ))
 
@@ -220,9 +219,15 @@ fig_cum.add_trace(go.Scatter(
 fig_cum.add_hline(y=0, line_dash="solid", line_color="#444444", line_width=1.5)
 
 fig_cum.update_layout(
+    xaxis=dict(
+        type="date",
+        tickformat="%m/%d",
+        nticks=6,  # スマホ画面でもラベルが重ならないよう自動間引き（最大約6個）
+        tickangle=0  # 横書きに固定
+    ),
     yaxis_title="累積騰落率 (%)", 
     height=420,
-    margin=dict(t=10, l=10, r=10, b=10), 
+    margin=dict(t=10, l=10, r=10, b=20), 
     legend=dict(orientation="h", y=-0.38, font=dict(size=9.5))
 )
 st.plotly_chart(fig_cum, use_container_width=True)
